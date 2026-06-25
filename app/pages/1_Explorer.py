@@ -61,7 +61,7 @@ st.divider()
 # ─── Carte des sous-zones ─────────────────────────────────────────────────
 st.markdown("##### Détail dans la zone")
 
-# Selon le niveau, on affiche le niveau immédiatement en-dessous
+
 sous_niveau = {"region": "departement", "departement": "commune", "commune": None}[niveau]
 
 if sous_niveau is None:
