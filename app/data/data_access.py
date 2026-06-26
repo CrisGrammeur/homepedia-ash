@@ -254,7 +254,6 @@ def get_prix_carte(
         gps = _commune_gps()
         df["latitude"] = df["code_zone"].map(lambda c: gps.get(c, (None, None))[0])
         df["longitude"] = df["code_zone"].map(lambda c: gps.get(c, (None, None))[1])
-        df = df.dropna(subset=["latitude", "longitude"])
     df["annee"] = annee
     df["type_local"] = type_local
     return df

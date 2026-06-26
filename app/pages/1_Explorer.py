@@ -93,17 +93,26 @@ else:
     )
     geojson_sous = get_geojson(sous_niveau, code_parent=code_zone)
 
-    if sous_niveau == "commune" and {"latitude", "longitude"}.issubset(df.columns):
+    # Communes géolocalisées (certaines n'ont pas de GPS → exclues de la carte à points).
+    if {"latitude", "longitude"}.issubset(df.columns):
+        df_geo = df.dropna(subset=["latitude", "longitude"])
+    else:
+        df_geo = df.iloc[0:0]
+
+    if sous_niveau == "commune" and not df_geo.empty:
         # Communes : pas de contours → pastilles ponctuelles colorées par prix au m².
-        vmin, vmax = float(df["prix_m2_median"].min()), float(df["prix_m2_median"].max())
+        vmin = float(df_geo["prix_m2_median"].min())
+        vmax = float(df_geo["prix_m2_median"].max())
+        if vmax == vmin:
+            vmax = vmin + 1
         colormap = cm.LinearColormap(
             ["#1A9850", "#FFFFBF", "#D73027"], # vert → jaune → rouge
             vmin=vmin, vmax=vmax,
             caption="Prix médian (€/m²)",
         )
-        centre = [df["latitude"].mean(), df["longitude"].mean()]
+        centre = [df_geo["latitude"].mean(), df_geo["longitude"].mean()]
         m = folium.Map(location=centre, zoom_start=9, tiles="cartodbpositron")
-        for _, r in df.iterrows():
+        for _, r in df_geo.iterrows():
             folium.CircleMarker(
                 location=[r["latitude"], r["longitude"]],
                 radius=10,
@@ -114,8 +123,8 @@ else:
         colormap.add_to(m)
         st_folium(m, height=520, use_container_width=True, returned_objects=[], key="map_explorer")
         st.caption(
-            f"{len(df)} commune(s) du département. Taille des pastilles fixe ; "
-            "couleur = prix médian au m²."
+            f"{len(df_geo)} commune(s) géolocalisée(s) du département. "
+            "Couleur = prix médian au m²."
         )
     elif geojson_sous:
         # Départements : choroplèthe CLIQUABLE (clic = drill vers les communes).
