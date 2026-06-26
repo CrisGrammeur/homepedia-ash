@@ -22,16 +22,19 @@ THEME = {
     "neutral": "#9E9E9E",
 }
 
-# Sources de données — valeurs par défaut neutres.
-# En production, tout se surcharge par variables d'env (cf. data_access.py) :
-#   HOMEPEDIA_PG_HOST, HOMEPEDIA_PG_PORT, HOMEPEDIA_PG_PWD, HOMEPEDIA_MONGO_URI
+# Sources de données. Le TOKEN se met en variable d'env / secret (jamais ici) :
+#   DATABRICKS_TOKEN   (host / http_path sont surchargeables par DATABRICKS_HOST / DATABRICKS_HTTP_PATH)
 # Aucun secret n'est stocké dans ce fichier.
 DATA_SOURCES = {
+    "databricks": {
+        "host": "dbc-4c1d15ca-34b7.cloud.databricks.com",
+        "http_path": "/sql/1.0/warehouses/8ca7219b9546df28",
+        # Token : variable d'env DATABRICKS_TOKEN uniquement.
+    },
     "postgres": {
         "host": "localhost", "port": 5432,
         "database": "homepediadb",
         "user": "homepedia",
-        # Mot de passe : variable d'env HOMEPEDIA_PG_PWD uniquement.
     },
     "mongodb": {
         "uri": "mongodb://localhost:27017",
