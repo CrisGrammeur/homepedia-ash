@@ -7,6 +7,7 @@ Lancer : streamlit run app/main.py
 import streamlit as st
 import plotly.express as px
 import folium
+import branca.colormap as cm
 from streamlit_folium import st_folium
 
 from components.sidebar import render_sidebar
@@ -65,25 +66,44 @@ with col_map:
     geojson_regions = get_geojson(niveau="region")
 
     if geojson_regions:
+        prix_par_code = dict(zip(df_carte["code_zone"], df_carte["prix_m2_median"]))
+        for f in geojson_regions:
+            f["properties"]["prix"] = int(prix_par_code.get(f["properties"]["code"], 0))
+        gj = {"type": "FeatureCollection", "features": geojson_regions}
+
+        prix_vals = [v for v in prix_par_code.values() if v]
+        colormap = cm.LinearColormap(
+            ["#1A9850", "#FFFFBF", "#D73027"],
+            vmin=min(prix_vals) if prix_vals else 0,
+            vmax=max(prix_vals) if prix_vals else 1,
+            caption=f"Prix médian {type_bien_carte.lower()} (€/m²) — {annee_carte}",
+        )
+
+        def _style(feat):
+            p = feat["properties"].get("prix") or 0
+            return {"fillColor": colormap(p) if p else "lightgray",
+                    "fillOpacity": 0.7, "color": "white", "weight": 1}
+
         m = folium.Map(location=[46.6, 2.5], zoom_start=5, tiles="cartodbpositron")
-        folium.Choropleth(
-            geo_data={"type": "FeatureCollection", "features": geojson_regions},
-            data=df_carte,
-            columns=["code_zone", "prix_m2_median"],
-            key_on="feature.properties.code",
-            fill_color="YlOrRd",
-            fill_opacity=0.7,
-            line_opacity=0.3,
-            nan_fill_color="lightgray",
-            legend_name=f"Prix médian {type_bien_carte.lower()} (€/m²) — {annee_carte}",
-        ).add_to(m)
-        # Tooltip au survol : nom de la région
         folium.GeoJson(
-            {"type": "FeatureCollection", "features": geojson_regions},
-            style_function=lambda _: {"fillOpacity": 0, "weight": 0},
-            tooltip=folium.GeoJsonTooltip(fields=["nom"], aliases=[""]),
+            gj, style_function=_style,
+            highlight_function=lambda _: {"weight": 3, "color": "#1E3A8A"},
+            tooltip=folium.GeoJsonTooltip(fields=["nom", "prix"], aliases=["Région", "Prix €/m² :"]),
         ).add_to(m)
-        st_folium(m, height=500, use_container_width=True, returned_objects=[], key="map_nat")
+        colormap.add_to(m)
+        out = st_folium(m, height=500, use_container_width=True,
+                        returned_objects=["last_active_drawing"], key="map_nat")
+        st.caption("Clique une région pour l'explorer en détail.")
+
+        drawing = (out or {}).get("last_active_drawing")
+        props = drawing.get("properties") if drawing else None
+        if props and props.get("code"):
+            r_code = props["code"]
+            r_nom = props.get("nom") or r_code
+            st.info(f"**{r_nom}** — prix médian {props.get('prix', 0):,} €/m²")
+            if st.button(f"Explorer {r_nom}", key="drill_region"):
+                st.session_state["_drill"] = {"niveau": "region", "region": r_code}
+                st.switch_page("pages/1_Explorer.py")
     else:
         # Filet de sécurité si le GeoJSON est absent
         fig = px.bar(

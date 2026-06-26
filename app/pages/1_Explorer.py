@@ -19,6 +19,16 @@ from data.data_access import (
 
 st.title("Explorer une zone")
 
+# Drill-down demandé via un clic sur la carte : on pré-sélectionne la zone
+# AVANT que la sidebar n'instancie ses widgets (sinon Streamlit refuse la modif).
+_drill = st.session_state.pop("_drill", None)
+if _drill:
+    st.session_state["sb_niveau"] = _drill["niveau"]
+    if _drill.get("region"):
+        st.session_state["sb_region"] = _drill["region"]
+    if _drill.get("dept"):
+        st.session_state["sb_dept"] = _drill["dept"]
+
 selection = render_sidebar()
 
 niveau = selection["niveau"]
@@ -108,29 +118,47 @@ else:
             "couleur = prix médian au m²."
         )
     elif geojson_sous:
-        # Départements : vraie choroplèthe sur les contours du niveau inférieur.
+        # Départements : choroplèthe CLIQUABLE (clic = drill vers les communes).
         prix_par_code = dict(zip(df["code_zone"], df["prix_m2_median"]))
         for f in geojson_sous:
             f["properties"]["prix"] = int(prix_par_code.get(f["properties"]["code"], 0))
         gj = {"type": "FeatureCollection", "features": geojson_sous}
 
+        prix_vals = [v for v in prix_par_code.values() if v]
+        colormap = cm.LinearColormap(
+            ["#1A9850", "#FFFFBF", "#D73027"],
+            vmin=min(prix_vals) if prix_vals else 0,
+            vmax=max(prix_vals) if prix_vals else 1,
+            caption="Prix médian (€/m²)",
+        )
+
+        def _style(feat):
+            p = feat["properties"].get("prix") or 0
+            return {"fillColor": colormap(p) if p else "lightgray",
+                    "fillOpacity": 0.7, "color": "white", "weight": 1}
+
         m = folium.Map(location=[46.6, 2.5], zoom_start=6, tiles="cartodbpositron")
-        folium.Choropleth(
-            geo_data=gj, data=df,
-            columns=["code_zone", "prix_m2_median"],
-            key_on="feature.properties.code",
-            fill_color="YlOrRd", fill_opacity=0.7, line_opacity=0.4,
-            nan_fill_color="lightgray",
-            legend_name="Prix médian (€/m²)",
-        ).add_to(m)
         folium.GeoJson(
-            gj,
-            style_function=lambda _: {"fillOpacity": 0, "weight": 0},
-            tooltip=folium.GeoJsonTooltip(fields=["nom", "prix"], aliases=["", "Prix €/m² :"]),
+            gj, style_function=_style,
+            highlight_function=lambda _: {"weight": 3, "color": "#1E3A8A"},
+            tooltip=folium.GeoJsonTooltip(fields=["nom", "prix"], aliases=["Département", "Prix €/m² :"]),
         ).add_to(m)
+        colormap.add_to(m)
         m.fit_bounds(m.get_bounds())
-        st_folium(m, height=520, use_container_width=True, returned_objects=[], key="map_explorer")
-        st.caption(f"{len(geojson_sous)} département(s) — couleur = prix médian au m².")
+        out = st_folium(m, height=520, use_container_width=True,
+                        returned_objects=["last_active_drawing"], key="map_explorer")
+        st.caption(f"{len(geojson_sous)} département(s) — clique un département pour explorer ses communes.")
+
+        drawing = (out or {}).get("last_active_drawing")
+        props = drawing.get("properties") if drawing else None
+        if props and props.get("code"):
+            d_code = props["code"]
+            d_nom = props.get("nom") or d_code
+            st.info(f"**{d_nom}** ({d_code}) — prix médian {props.get('prix', 0):,} €/m²")
+            if st.button(f"Explorer {d_nom} et ses communes", key="drill_dept"):
+                st.session_state["_drill"] = {"niveau": "departement",
+                                              "region": props.get("code_parent"), "dept": d_code}
+                st.rerun()
     else:
         # Filet de sécurité (ex : région sans contours dispo) → bar chart.
         df_sorted = df.sort_values("prix_m2_median", ascending=True)
