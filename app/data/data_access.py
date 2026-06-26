@@ -87,8 +87,22 @@ def _scalar(sql: str, default=0, **params):
     return d.iloc[0, 0]
 
 
+@st.cache_data(ttl=3600)
+def _dept_noms() -> dict:
+    """Code département -> nom, lu depuis le GeoJSON des départements."""
+    f = _GEO_DIR / "departements.geojson"
+    if not f.exists():
+        return {}
+    feats = json.loads(f.read_text(encoding="utf-8"))["features"]
+    return {x["properties"]["code"]: x["properties"]["nom"] for x in feats}
+
+
 def _nom_zone(niveau: str, code: str) -> str:
-    return REGIONS_NOMS.get(code, code) if niveau == "region" else str(code)
+    if niveau == "region":
+        return REGIONS_NOMS.get(code, code)
+    if niveau == "departement":
+        return _dept_noms().get(code, code)
+    return str(code)
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -109,7 +123,8 @@ def get_departements(code_region: str | None = None) -> pd.DataFrame:
            'FROM dim_communes WHERE "codeDepartement" IS NOT NULL')
     df = _df(sql + ' AND "codeRegion" = :reg ORDER BY 1', reg=code_region) if code_region \
         else _df(sql + " ORDER BY 1")
-    df["nom"] = df["code_dept"]
+    noms = _dept_noms()
+    df["nom"] = df["code_dept"].map(lambda c: noms.get(c, c))
     return df
 
 
@@ -193,7 +208,7 @@ def get_prix_carte(
             df = _df(sql, annee=str(annee), type=type_local, parent=code_parent)
         else:
             df = _df(sql, annee=str(annee), type=type_local)
-        df["nom"] = df["code_zone"]
+        df["nom"] = df["code_zone"].map(lambda c: _nom_zone("departement", c))
     else:
         sql = ("SELECT code_commune AS code_zone, nom_commune AS nom, "
                "ROUND(prix_median_m2) AS prix_m2_median, nb_transactions AS nb_ventes "
