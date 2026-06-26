@@ -10,7 +10,7 @@ import folium
 from streamlit_folium import st_folium
 
 from components.sidebar import render_sidebar
-from data.mock_data import (
+from data.data_access import (
     get_kpis_nationaux,
     get_prix_carte,
     get_geojson,

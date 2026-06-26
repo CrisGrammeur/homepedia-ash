@@ -8,7 +8,7 @@ import folium
 from streamlit_folium import st_folium
 
 from components.sidebar import render_sidebar
-from data.mock_data import get_zones_accessibles, get_geojson
+from data.data_access import get_zones_accessibles, get_geojson
 
 render_sidebar()
 

@@ -10,7 +10,7 @@ import folium
 from streamlit_folium import st_folium
 
 from components.sidebar import render_sidebar
-from data.mock_data import (
+from data.data_access import (
     get_fiche_commune,
     get_prix_serie_temporelle,
     get_notes_categorielles,
@@ -66,17 +66,20 @@ with col_titre:
     st.markdown(f"## {fiche['nom']}")
     st.caption(f"Code INSEE : `{code_insee}` · Pop. {fiche['population']:,} hab. · Densité {fiche['densite']:,.0f} hab/km²")
 with col_score:
-    st.metric("Score qualité de vie", f"{fiche['score_qualite_vie']}/10")
+    st.metric("Score qualité de vie", f"{fiche['score_qualite_vie']}/100")
 with col_map:
     lat, lon = fiche["latitude"], fiche["longitude"]
-    m = folium.Map(location=[lat, lon], zoom_start=12, tiles="cartodbpositron")
-    folium.Marker(
-        [lat, lon],
-        tooltip=fiche["nom"],
-        popup=f"{fiche['nom']} — {fiche['prix_m2_appart']:,} €/m² (appart.)",
-        icon=folium.Icon(color="blue", icon="home", prefix="fa"),
-    ).add_to(m)
-    st_folium(m, height=200, use_container_width=True, returned_objects=[], key="map_fiche")
+    if lat is not None and lon is not None:
+        m = folium.Map(location=[lat, lon], zoom_start=12, tiles="cartodbpositron")
+        folium.Marker(
+            [lat, lon],
+            tooltip=fiche["nom"],
+            popup=f"{fiche['nom']} — {fiche['prix_m2_appart']:,} €/m² (appart.)",
+            icon=folium.Icon(color="blue", icon="home", prefix="fa"),
+        ).add_to(m)
+        st_folium(m, height=200, use_container_width=True, returned_objects=[], key="map_fiche")
+    else:
+        st.caption("Localisation cartographique non disponible.")
 
 st.divider()
 
@@ -122,48 +125,46 @@ st.caption("Sources : annuaire de l'éducation nationale et SNCF Open Data.")
 
 st.divider()
 
-# ─── Bloc 4 : note habitants + radar ─────────────────────────────────────
+# ─── Bloc 4 : avis des habitants (NLP) ───────────────────────────────────
 st.markdown("##### Avis des habitants")
 
-col_radar, col_wc = st.columns(2)
+notes = get_notes_categorielles(code_insee)
+mots = get_wordcloud("commune", code_insee, "global")
+avis = get_avis_recents(code_insee, n=5)
 
-with col_radar:
-    notes = get_notes_categorielles(code_insee)
-    labels = list(notes.keys())
-    values = list(notes.values())
-    fig_radar = go.Figure(go.Scatterpolar(
-        r=values + [values[0]],
-        theta=labels + [labels[0]],
-        fill="toself",
-        line_color="#1E3A8A",
-    ))
-    fig_radar.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, 10])),
-        height=380, margin=dict(l=20, r=20, t=20, b=20), showlegend=False,
-    )
-    st.markdown(f"**Note globale habitants : {fiche['note_habitants']}/10**")
-    st.plotly_chart(fig_radar, use_container_width=True)
-
-with col_wc:
-    st.markdown("**Mots-clés des avis**")
-    mots = get_wordcloud("commune", code_insee, "global")
-    df_mots = pd.DataFrame(mots).sort_values("poids", ascending=True).tail(10)
-    color_map = {"positif": "#4CAF50", "neutre": "#9E9E9E", "negatif": "#F44336"}
-    fig_mots = px.bar(
-        df_mots, x="poids", y="mot",
-        color="sentiment", color_discrete_map=color_map, orientation="h",
-        labels={"poids": "", "mot": ""},
-    )
-    fig_mots.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=10))
-    st.plotly_chart(fig_mots, use_container_width=True)
-
-# ─── Avis récents ────────────────────────────────────────────────────────
-with st.expander("Voir les avis récents"):
-    avis = get_avis_recents(code_insee, n=5)
-    for _, av in avis.iterrows():
-        st.markdown(f"**{av['note']}/10** — *{av['date'].strftime('%d/%m/%Y')}*")
-        st.markdown(f"> {av['texte']}")
-        st.divider()
+if not notes and not mots and avis.empty:
+    st.caption("Avis et analyse NLP non disponibles dans cette version.")
+else:
+    col_radar, col_wc = st.columns(2)
+    with col_radar:
+        if notes:
+            labels, values = list(notes.keys()), list(notes.values())
+            fig_radar = go.Figure(go.Scatterpolar(
+                r=values + [values[0]], theta=labels + [labels[0]],
+                fill="toself", line_color="#1E3A8A",
+            ))
+            fig_radar.update_layout(
+                polar=dict(radialaxis=dict(visible=True, range=[0, 10])),
+                height=380, margin=dict(l=20, r=20, t=20, b=20), showlegend=False,
+            )
+            st.plotly_chart(fig_radar, use_container_width=True)
+    with col_wc:
+        if mots:
+            df_mots = pd.DataFrame(mots).sort_values("poids", ascending=True).tail(10)
+            color_map = {"positif": "#4CAF50", "neutre": "#9E9E9E", "negatif": "#F44336"}
+            fig_mots = px.bar(
+                df_mots, x="poids", y="mot",
+                color="sentiment", color_discrete_map=color_map, orientation="h",
+                labels={"poids": "", "mot": ""},
+            )
+            fig_mots.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=10))
+            st.plotly_chart(fig_mots, use_container_width=True)
+    if not avis.empty:
+        with st.expander("Voir les avis récents"):
+            for _, av in avis.iterrows():
+                st.markdown(f"**{av['note']}/10** — *{av['date'].strftime('%d/%m/%Y')}*")
+                st.markdown(f"> {av['texte']}")
+                st.divider()
 
 # ─── Actions ──────────────────────────────────────────────────────────────
 st.divider()

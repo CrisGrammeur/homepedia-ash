@@ -7,7 +7,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from components.sidebar import render_sidebar
-from data.mock_data import (
+from data.data_access import (
     get_sentiment_aggrege,
     get_wordcloud,
     get_avis_recents,
@@ -32,11 +32,16 @@ if not code_insee:
 # Récupère le nom
 nom_commune = st.session_state.get("selected_commune_nom") or selection.get("zone_label", code_insee)
 st.markdown(f"### Avis sur **{nom_commune}**")
-st.caption(f"Source : ville-ideale.fr · Analyse NLP réalisée par le pipeline Spark de Peace")
+st.caption("Source : ville-ideale.fr · analyse NLP")
 
 # ─── Vue d'ensemble : sentiment + score ──────────────────────────────────
 sent = get_sentiment_aggrege("commune", code_insee)
 notes = get_notes_categorielles(code_insee)
+
+# Données NLP absentes (MongoDB non branché) → message clair plutôt qu'un crash
+if not notes and sum(sent.values()) == 0:
+    st.info("Analyse des avis non disponible dans cette version (données NLP non chargées).")
+    st.stop()
 
 col_donut, col_radar = st.columns(2)
 

@@ -8,7 +8,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from components.sidebar import render_sidebar
-from data.mock_data import (
+from data.data_access import (
     get_communes,
     get_departements,
     get_regions,

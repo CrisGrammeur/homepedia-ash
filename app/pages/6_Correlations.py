@@ -7,7 +7,7 @@ import numpy as np
 import plotly.express as px
 
 from components.sidebar import render_sidebar
-from data.mock_data import get_correlation, get_indicateurs_disponibles
+from data.data_access import get_correlation, get_indicateurs_disponibles
 
 render_sidebar()
 

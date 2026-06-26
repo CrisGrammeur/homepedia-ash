@@ -3,7 +3,7 @@ Sidebar : recherche par nom + sélecteurs en cascade.
 Stocke la sélection dans st.session_state pour partage entre pages.
 """
 import streamlit as st
-from data.mock_data import get_regions, get_departements, get_communes, search_communes
+from data.data_access import get_regions, get_departements, get_communes, search_communes
 
 
 def render_sidebar() -> dict:
