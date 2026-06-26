@@ -36,17 +36,21 @@ st.markdown("### Immobilier")
 
 st.markdown("#### Prix médian au m²")
 st.markdown(
-    "Prix de marché observé, par commune (ou département), par année et par type de bien "
-    "(appartement / maison). On calcule, pour chaque transaction, le prix au m², puis on en prend la **médiane**."
+    "Prix de marché observé (source **DVF**), par commune (ou département), par année et par type de bien "
+    "(appartement / maison). Pour chaque transaction on calcule le prix au m², puis on en prend la "
+    "**médiane** (`percentile_approx(…, 0.5)`)."
 )
-st.latex(r"\text{prix\_m2} = \frac{\text{valeur\_foncière}}{\text{surface}} \quad;\quad \text{prix médian} = \text{médiane des prix\_m2}")
-st.info("La **médiane** (et non la moyenne) est utilisée : elle est robuste aux ventes atypiques (très chères ou très basses).")
+st.latex(r"\text{prix\_m2} = \frac{\text{valeur\_foncière}}{\text{surface réelle bâtie}} \quad;\quad \text{prix médian} = \text{médiane des prix\_m2}")
+st.info(
+    "La **médiane** (et non la moyenne) est utilisée car la distribution des prix est très **asymétrique** "
+    "(coefficient d'asymétrie ≈ 5,8) : la moyenne serait tirée vers le haut par quelques biens très chers."
+)
 st.warning(
-    "**Petits volumes** : dans les communes à faible nombre de transactions, la médiane est "
-    "peu fiable. Vérifiez le **nombre de ventes** affiché.\n\n"
-    "**Paris / Lyon / Marseille** : les transactions sont rattachées aux **arrondissements** "
-    "(75101…, 69381…, 13201…), pas à la commune-mère. La fiche de Paris/Lyon/Marseille « entière » "
-    "peut donc afficher un prix à 0."
+    "**Filtre des aberrants** : seules les transactions avec **100 € < prix/m² < 50 000 €** sont retenues.\n\n"
+    "**Prix de repli** : pour les communes **sans transaction DVF (~18 150 communes)**, le prix affiché est "
+    "celui du **département** (colonne `source_prix = 'departement'`).\n\n"
+    "**Petits volumes** : à faible nombre de ventes, la médiane reste peu fiable (cf. le **nombre de ventes** affiché).\n\n"
+    "**Paris / Lyon / Marseille** : transactions rattachées aux **arrondissements** — l'app les réagrège vers la commune-mère."
 )
 
 st.markdown("#### Évolution des prix (1, 3, 5 ans)")
@@ -59,12 +63,18 @@ st.markdown("Loyer **prédit** au m² (logement type), issu du modèle national 
 st.warning("C'est une **estimation modélisée**, pas un loyer réellement observé pour un bien donné. À considérer comme un ordre de grandeur.")
 
 st.markdown("#### Effort immobilier")
-st.markdown("Nombre d'**années de revenu médian** nécessaires pour acheter un logement de référence de **70 m²**.")
+st.markdown(
+    "Indicateur standard **INSEE / FNAIM** : nombre d'**années de revenu médian** nécessaires pour acheter "
+    "un logement de référence de **70 m²** (surface type INSEE). Médiane nationale ≈ **6,7 ans**."
+)
 st.latex(r"\text{effort} = \frac{\text{prix\_m2}\times 70}{\text{revenu médian annuel}}")
 st.markdown("Interprétation indicative : *Très accessible* (~3) · *Accessible* (~6) · *Modéré* (~8) · *Élevé / Très élevé* (>15).")
 
 st.markdown("#### Rentabilité locative brute")
-st.markdown("Rendement brut annuel d'un investissement locatif (avant charges et fiscalité).")
+st.markdown(
+    "Rendement brut annuel d'un investissement locatif. Le seuil de **5 %** est le **consensus professionnel "
+    "(FNAIM)** au-delà duquel l'achat est favorable à la location. Médiane nationale ≈ **5,8 %**."
+)
 st.latex(r"\text{rentabilité brute (\%)} = \frac{\text{loyer\_m2}\times 12}{\text{prix\_m2}}\times 100")
 st.warning("**Brute** : ne déduit ni charges, ni taxe foncière, ni vacance, ni fiscalité. Le rendement net réel est inférieur.")
 
@@ -102,25 +112,42 @@ st.markdown("### Indicateurs de synthèse")
 
 st.markdown("#### Score qualité de vie (sur 100)")
 st.markdown(
-    "Indice **composite** combinant cinq dimensions, chacune normalisée entre 0 et 1 "
-    "(prix, revenu, transport, éducation, social), puis ramenée sur 100."
+    "Indice **composite** combinant cinq dimensions, chacune **normalisée min-max entre 0 et 1** "
+    "sur l'ensemble des communes, pondérée puis ramenée sur 100. Les pondérations sont issues de la "
+    "**littérature académique** en économie immobilière."
 )
-st.latex(r"\text{score} \approx 100 \times \big(\text{combinaison pondérée de } n_{\text{prix}}, n_{\text{revenu}}, n_{\text{transport}}, n_{\text{éducation}}, n_{\text{social}}\big)")
-st.markdown("Catégories : **Faible** (< 30) · **Moyen** (30–50) · **Bon** (≥ 50).")
+st.latex(r"n_x = \frac{x - x_{min}}{x_{max} - x_{min}} \quad;\quad \text{score} = 100 \times (0.30\,n_{prix} + 0.25\,n_{revenu} + 0.20\,n_{transport} + 0.15\,n_{\text{éduc}} + 0.10\,n_{social})")
+st.markdown("""
+| Dimension | Poids | Calculée à partir de |
+|---|---|---|
+| Prix | **30 %** | prix médian au m² (normalisé) |
+| Revenu | **25 %** | revenu médian des ménages |
+| Transport | **20 %** | desserte (nombre de gares) |
+| Éducation | **15 %** | nombre d'établissements scolaires |
+| Social | **10 %** | indicateur social |
+
+Catégories : **Faible** (< 30) · **Moyen** (30–50) · **Bon** (≥ 50).
+""")
 st.warning(
     "**Composite** : un score unique masque des réalités contrastées (une commune peut être bien notée "
     "en transport mais mal en éducation).\n\n"
-    "**Pondération à confirmer** : la combinaison exacte des sous-scores est définie dans le pipeline "
-    "amont et n'est pas redocumentée ici.\n\n"
-    "**Prix de repli** : pour les communes sans prix communal fiable (dont Paris/Lyon/Marseille), "
-    "le sous-score prix s'appuie sur le **prix départemental** (`source_prix = 'departement'`)."
+    "**Normalisation relative** : les sous-scores sont min-max sur toutes les communes — un score "
+    "mesure donc une position *relative*, pas une valeur absolue.\n\n"
+    "**Transformation `log1p`** appliquée aux dimensions transport et éducation avant normalisation, "
+    "pour atténuer l'effet des très grandes villes (Paris).\n\n"
+    "**Prix de repli** : pour les communes sans prix communal fiable, le sous-score prix s'appuie sur "
+    "le **prix départemental** (`source_prix = 'departement'`)."
 )
 
 st.markdown("#### Profil de commune (cluster)")
 st.markdown(
-    "Classification non supervisée des communes en **5 profils** types à partir de leurs indicateurs : "
-    "*Commune rurale*, *Bourg avec services*, *Territoire rural privilégié*, *Zone résidentielle aisée*, "
-    "*Ville-centre urbaine*."
+    "Classification non supervisée par **K-means** en **5 profils** (k=5 retenu par la **méthode du coude** "
+    "et le score de **silhouette** ≈ 0,38). Variables : prix m², revenu médian, nb de gares, nb d'établissements, "
+    "taux de pauvreté — toutes **standardisées** (`StandardScaler`, centrage-réduction) avant le clustering."
+)
+st.markdown(
+    "Profils obtenus : *Commune rurale*, *Bourg avec services*, *Territoire rural privilégié*, "
+    "*Zone résidentielle aisée*, *Ville-centre urbaine*."
 )
 st.warning("Un cluster est une **catégorie descriptive**, pas un classement de qualité.")
 

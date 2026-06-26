@@ -9,6 +9,7 @@ import branca.colormap as cm
 from streamlit_folium import st_folium
 
 from components.sidebar import render_sidebar
+from components.disclaimer import render_disclaimer
 from data.data_access import (
     get_kpis_zone,
     get_prix_serie_temporelle,
@@ -37,6 +38,7 @@ zone_label = selection["zone_label"]
 types = selection["type_local"]
 
 st.markdown(f"### {zone_label} \n*niveau : {niveau}*")
+render_disclaimer()
 
 # ─── KPIs zone ────────────────────────────────────────────────────────────
 kpis = get_kpis_zone(niveau, code_zone)

@@ -8,12 +8,14 @@ import folium
 from streamlit_folium import st_folium
 
 from components.sidebar import render_sidebar
+from components.disclaimer import render_disclaimer
 from data.data_access import get_zones_accessibles, get_geojson
 
 render_sidebar()
 
 st.title("Pouvoir d'achat")
 st.caption("Avec un budget donné, identifie les zones où ton projet est réalisable.")
+render_disclaimer()
 
 # ─── Paramètres ──────────────────────────────────────────────────────────
 col_budget, col_surface, col_type = st.columns(3)

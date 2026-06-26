@@ -10,6 +10,7 @@ import folium
 from streamlit_folium import st_folium
 
 from components.sidebar import render_sidebar
+from components.disclaimer import render_disclaimer
 from data.data_access import (
     get_fiche_commune,
     get_prix_serie_temporelle,
@@ -81,6 +82,7 @@ with col_map:
     else:
         st.caption("Localisation cartographique non disponible.")
 
+render_disclaimer()
 st.divider()
 
 # ─── Bloc 1 : indicateurs immobilier ─────────────────────────────────────

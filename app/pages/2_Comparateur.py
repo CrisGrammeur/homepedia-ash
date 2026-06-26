@@ -8,6 +8,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from components.sidebar import render_sidebar
+from components.disclaimer import render_disclaimer
 from data.data_access import (
     get_communes,
     get_departements,
@@ -20,6 +21,7 @@ render_sidebar()
 
 st.title("Comparateur de zones")
 st.caption("Compare 2 à 3 zones côte à côte sur les indicateurs clés.")
+render_disclaimer()
 
 # ─── Sélection des zones à comparer ──────────────────────────────────────
 st.markdown("##### Sélectionne les zones à comparer")

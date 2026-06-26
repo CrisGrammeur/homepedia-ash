@@ -11,6 +11,7 @@ import branca.colormap as cm
 from streamlit_folium import st_folium
 
 from components.sidebar import render_sidebar
+from components.disclaimer import render_disclaimer
 from data.data_access import (
     get_kpis_nationaux,
     get_prix_carte,
@@ -35,6 +36,7 @@ st.caption("Exploration du marché immobilier français — analyse statistique,
 st.divider()
 
 st.subheader("Vue nationale")
+render_disclaimer()
 
 # ─── KPIs nationaux ───────────────────────────────────────────────────────
 kpis = get_kpis_nationaux()

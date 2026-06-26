@@ -7,6 +7,7 @@ import numpy as np
 import plotly.express as px
 
 from components.sidebar import render_sidebar
+from components.disclaimer import render_disclaimer
 from data.data_access import get_correlation, get_indicateurs_disponibles
 
 render_sidebar()
@@ -16,6 +17,7 @@ st.caption(
     "Croise deux indicateurs sur toutes les zones d'un niveau pour repérer "
     "un lien statistique (ex : revenu médian vs taux de pauvreté)."
 )
+render_disclaimer()
 
 # ─── Sélection des indicateurs ───────────────────────────────────────────
 indic = get_indicateurs_disponibles()
