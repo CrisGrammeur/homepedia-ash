@@ -37,6 +37,22 @@ REGIONS_NOMS = {
     "01": "Guadeloupe", "02": "Martinique", "03": "Guyane", "04": "La Réunion", "06": "Mayotte",
 }
 
+# Sous le seuil de transactions, une médiane de prix est jugée peu fiable.
+SEUIL_TRANSACTIONS = 5
+
+# Paris / Lyon / Marseille : prix & équipements rattachés aux arrondissements.
+# On réagrège vers la commune-mère.
+ARRONDISSEMENTS = {
+    "75056": [f"751{i:02d}" for i in range(1, 21)],   # Paris 75101..75120
+    "69123": [f"6938{i}" for i in range(1, 10)],        # Lyon  69381..69389
+    "13055": [f"132{i:02d}" for i in range(1, 17)],     # Marseille 13201..13216
+}
+
+
+def _codes_commune(code: str) -> list[str]:
+    """Code commune + ses arrondissements éventuels (Paris/Lyon/Marseille)."""
+    return [code] + ARRONDISSEMENTS.get(code, [])
+
 
 # ═════════════════════════════════════════════════════════════════════════
 # CONNEXION (lazy + cache session)
@@ -129,22 +145,29 @@ def get_prix_serie_temporelle(
     if type_local is None:
         type_local = ["Maison", "Appartement"]
     if niveau == "commune":
-        sql = ("SELECT annee::int AS annee, type_local, ROUND(prix_median_m2) AS prix_m2_median, "
-               "nb_transactions AS nb_ventes FROM fact_prix "
-               "WHERE code_commune = :code AND type_local = ANY(:types) "
-               "AND annee::int BETWEEN :amin AND :amax ORDER BY annee")
+        # ANY(:codes) réagrège les arrondissements ; moyenne pondérée par le nb de ventes.
+        sql = ("SELECT annee::int AS annee, type_local, "
+               "ROUND(SUM(prix_median_m2*nb_transactions)/NULLIF(SUM(nb_transactions),0)) AS prix_m2_median, "
+               "SUM(nb_transactions) AS nb_ventes FROM fact_prix "
+               "WHERE code_commune = ANY(:codes) AND type_local = ANY(:types) "
+               "AND annee::int BETWEEN :amin AND :amax GROUP BY annee, type_local ORDER BY annee")
+        df = _df(sql, codes=_codes_commune(code_zone), types=list(type_local), amin=annee_min, amax=annee_max)
     elif niveau == "departement":
         sql = ("SELECT annee::int AS annee, type_local, ROUND(prix_median_m2) AS prix_m2_median, "
                "nb_transactions AS nb_ventes FROM fact_prix_dept "
                "WHERE code_departement = :code AND type_local = ANY(:types) "
                "AND annee::int BETWEEN :amin AND :amax ORDER BY annee")
+        df = _df(sql, code=code_zone, types=list(type_local), amin=annee_min, amax=annee_max)
     else:
         sql = ('SELECT annee::int AS annee, type_local, ROUND(AVG(prix_median_m2)) AS prix_m2_median, '
                'SUM(nb_transactions) AS nb_ventes FROM fact_prix p '
                'JOIN dim_communes d ON d.code = p.code_commune '
                'WHERE d."codeRegion" = :code AND type_local = ANY(:types) '
                'AND annee::int BETWEEN :amin AND :amax GROUP BY annee, type_local ORDER BY annee')
-    return _df(sql, code=code_zone, types=list(type_local), amin=annee_min, amax=annee_max)
+        df = _df(sql, code=code_zone, types=list(type_local), amin=annee_min, amax=annee_max)
+    if not df.empty:
+        df["fiable"] = df["nb_ventes"] >= SEUIL_TRANSACTIONS
+    return df
 
 
 @st.cache_data(ttl=3600)
@@ -264,32 +287,48 @@ def get_fiche_commune(code_insee: str) -> dict:
         return {"code_insee": code_insee, "nom": "Commune inconnue", "latitude": None,
                 "longitude": None, "population": 0, "densite": 0, "evolution_pop_5ans": 0.0,
                 "revenu_median": 0, "taux_pauvrete": 0.0, "taux_chomage": 0.0,
-                "prix_m2_appart": 0, "prix_m2_maison": 0, "loyer_predit_m2": 0.0,
-                "nb_transactions_2024": 0, "nb_ecoles_total": 0, "nb_ecoles_publiques": 0,
-                "nb_ecoles_privees": 0, "nb_gares": 0, "score_qualite_vie": 0.0, "note_habitants": 0.0}
+                "prix_m2_appart": 0, "prix_m2_maison": 0, "nb_ventes_appart": 0, "nb_ventes_maison": 0,
+                "loyer_predit_m2": 0.0, "nb_transactions_2024": 0, "nb_ecoles_total": 0,
+                "nb_ecoles_publiques": 0, "nb_ecoles_privees": 0, "ecoles_pour_1000hab": 0.0,
+                "nb_gares": 0, "score_qualite_vie": 0.0, "note_habitants": 0.0}
 
-    def prix(tl):
-        return _scalar("SELECT ROUND(prix_median_m2) FROM fact_prix WHERE code_commune=:c "
-                       "AND type_local=:tl ORDER BY annee DESC LIMIT 1", c=code_insee, tl=tl)
+    codes = _codes_commune(code_insee)
+    pop = int(dim.iloc[0]["population"]) if pd.notna(dim.iloc[0]["population"]) else 0
+
+    def prix_nb(tl):
+        # Prix de la dernière année dispo, agrégé sur les arrondissements (pondéré par nb ventes).
+        d = _df("SELECT ROUND(SUM(prix_median_m2*nb_transactions)/NULLIF(SUM(nb_transactions),0)) AS prix, "
+                "COALESCE(SUM(nb_transactions),0) AS nb FROM fact_prix "
+                "WHERE code_commune = ANY(:codes) AND type_local = :tl AND annee = "
+                "(SELECT MAX(annee) FROM fact_prix WHERE code_commune = ANY(:codes) AND type_local = :tl)",
+                codes=codes, tl=tl)
+        if d.empty or pd.isna(d.iloc[0]["prix"]):
+            return 0, 0
+        return int(d.iloc[0]["prix"]), int(d.iloc[0]["nb"])
+    pa, na = prix_nb("Appartement")
+    pm, nm = prix_nb("Maison")
+
     rev = _df("SELECT revenu_median, taux_pauvrete_dept FROM fact_revenus "
               "WHERE code_insee=:c ORDER BY annee DESC LIMIT 1", c=code_insee)
     annee_max = _scalar("SELECT MAX(annee) FROM fact_prix", default=None)
+    nb_ecoles = int(_scalar('SELECT SUM(nb_etablissements) FROM fact_education WHERE "Code_commune" = ANY(:codes)', codes=codes))
     return {
         "code_insee": code_insee,
         "nom": dim.iloc[0]["nom"],
         "latitude": None, "longitude": None,
-        "population": int(dim.iloc[0]["population"]) if pd.notna(dim.iloc[0]["population"]) else 0,
+        "population": pop,
         "densite": 0, "evolution_pop_5ans": 0.0,
         "revenu_median": int(rev.iloc[0]["revenu_median"]) if not rev.empty and pd.notna(rev.iloc[0]["revenu_median"]) else 0,
         "taux_pauvrete": float(rev.iloc[0]["taux_pauvrete_dept"]) if not rev.empty and pd.notna(rev.iloc[0]["taux_pauvrete_dept"]) else 0.0,
         "taux_chomage": 0.0,
-        "prix_m2_appart": int(prix("Appartement")),
-        "prix_m2_maison": int(prix("Maison")),
-        "loyer_predit_m2": round(float(_scalar("SELECT loyer_median_m2 FROM fact_loyers WHERE code_insee=:c", c=code_insee)), 1),
-        "nb_transactions_2024": int(_scalar("SELECT SUM(nb_transactions) FROM fact_prix WHERE code_commune=:c AND annee=:a", c=code_insee, a=annee_max)),
-        "nb_ecoles_total": int(_scalar('SELECT nb_etablissements FROM fact_education WHERE "Code_commune"=:c', c=code_insee)),
+        "prix_m2_appart": pa, "prix_m2_maison": pm,
+        "nb_ventes_appart": na, "nb_ventes_maison": nm,
+        "loyer_predit_m2": round(float(_scalar("SELECT AVG(loyer_median_m2) FROM fact_loyers WHERE code_insee = ANY(:codes)", codes=codes)), 1),
+        "nb_transactions_2024": int(_scalar("SELECT SUM(nb_transactions) FROM fact_prix WHERE code_commune = ANY(:codes) AND annee=:a", codes=codes, a=annee_max)),
+        "nb_ecoles_total": nb_ecoles,
         "nb_ecoles_publiques": 0, "nb_ecoles_privees": 0,
-        "nb_gares": int(_scalar("SELECT nb_gares FROM fact_transport WHERE code_commune=:c", c=code_insee)),
+        "ecoles_pour_1000hab": round(nb_ecoles / pop * 1000, 2) if pop else 0.0,
+        "nb_gares": int(_scalar("SELECT SUM(nb_gares) FROM fact_transport WHERE code_commune = ANY(:codes)", codes=codes)),
         "score_qualite_vie": round(float(_scalar("SELECT score_qualite_vie FROM fact_qualite_vie WHERE code_commune=:c", c=code_insee)), 1),
         "note_habitants": 0.0,
     }

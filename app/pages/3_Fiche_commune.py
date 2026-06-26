@@ -91,6 +91,12 @@ c2.metric("Prix m² maison", f"{fiche['prix_m2_maison']:,} €")
 c3.metric("Loyer prédit /m²", f"{fiche['loyer_predit_m2']} €")
 c4.metric("Transactions 2024", f"{fiche['nb_transactions_2024']:,}")
 
+if min(fiche["nb_ventes_appart"], fiche["nb_ventes_maison"]) < 5:
+    st.caption(
+        f"Prix à interpréter avec prudence : faible volume de ventes sur la dernière année "
+        f"({fiche['nb_ventes_appart']} appartements, {fiche['nb_ventes_maison']} maisons)."
+    )
+
 # Mini graphe d'évolution
 serie = get_prix_serie_temporelle("commune", code_insee, ["Maison", "Appartement"], 2018, 2025)
 fig_evol = px.line(
@@ -105,21 +111,18 @@ st.divider()
 
 # ─── Bloc 2 : socio-éco ──────────────────────────────────────────────────
 st.markdown("##### Socio-économique")
-c1, c2, c3, c4 = st.columns(4)
+c1, c2 = st.columns(2)
 c1.metric("Revenu médian", f"{fiche['revenu_median']:,} €")
 c2.metric("Taux de pauvreté (dépt.)", f"{fiche['taux_pauvrete']}%")
-c3.metric("Taux de chômage", f"{fiche['taux_chomage']}%")
-c4.metric("Évolution pop. 5 ans", f"{fiche['evolution_pop_5ans']:+.1f}%")
 
 st.divider()
 
 # ─── Bloc 3 : équipements ────────────────────────────────────────────────
 st.markdown("##### Équipements & services")
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3 = st.columns(3)
 c1.metric("Écoles (total)", fiche["nb_ecoles_total"])
-c2.metric("Écoles publiques", fiche["nb_ecoles_publiques"])
-c3.metric("Écoles privées", fiche["nb_ecoles_privees"])
-c4.metric("Gares SNCF", fiche["nb_gares"])
+c2.metric("Écoles / 1 000 hab.", f"{fiche['ecoles_pour_1000hab']:.2f}")
+c3.metric("Gares SNCF", fiche["nb_gares"])
 
 st.caption("Sources : annuaire de l'éducation nationale et SNCF Open Data.")
 
