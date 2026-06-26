@@ -18,15 +18,15 @@ st.warning(
 # ─── Sources ──────────────────────────────────────────────────────────────
 st.markdown("### Sources de données")
 st.markdown("""
-| Source | Fournit | Table |
+| Source | Fournit | Table (Databricks) |
 |---|---|---|
-| **DVF** — Demandes de valeurs foncières (data.gouv.fr) | Transactions immobilières, prix | `fact_prix`, `fact_prix_dept`, `fact_evolution` |
-| **INSEE Filosofi** | Revenu médian, taux de pauvreté | `fact_revenus` |
-| **Carte des loyers** (ANIL / data.gouv.fr) | Loyer prédit au m² | `fact_loyers` |
-| **Annuaire de l'Éducation nationale** | Établissements scolaires | `fact_education` |
-| **SNCF Open Data** | Gares | `fact_transport` |
-| **Référentiel INSEE** | Communes, population, codes | `dim_communes` |
-| **Composites internes** | Score qualité de vie, effort, rentabilité, clusters | `fact_qualite_vie`, `fact_effort`, `fact_rentabilite`, `fact_clusters` |
+| **DVF** — Demandes de valeurs foncières (data.gouv.fr) | Transactions, prix, coordonnées | `gold.prix_par_commune`, `gold.prix_par_departement`, `gold.evolution_prix`, `silver.transactions_dvf` |
+| **INSEE Filosofi** | Revenu médian, taux de pauvreté | `gold.revenus_par_commune` |
+| **Carte des loyers** (ANIL / data.gouv.fr) | Loyer prédit au m² | `gold.loyers_par_commune` |
+| **Annuaire de l'Éducation nationale** | Établissements scolaires | `gold.education_par_commune` |
+| **SNCF Open Data** | Gares | `gold.score_transport` |
+| **Référentiel INSEE** | Communes, population, région | `silver.communes` |
+| **Composites internes** | Score qualité de vie, effort, rentabilité, clusters | `gold.score_qualite_vie`, `gold.effort_immobilier`, `gold.rentabilite_locative`, `gold.clusters_communes` |
 """)
 
 st.divider()
@@ -157,7 +157,7 @@ st.divider()
 st.markdown("### Pouvoir d'achat")
 st.markdown("Pour un budget et une surface donnés, une zone est dite **accessible** si :")
 st.latex(r"\text{prix\_m2}\times \text{surface} \le \text{budget} \qquad ; \qquad \text{surface max} = \frac{\text{budget}}{\text{prix\_m2}}")
-st.warning("Calcul basé sur le **prix médian** de la zone : c'est un ordre de grandeur, pas le prix d'un bien réel. Frais de notaire, travaux et apport ne sont pas inclus.")
+st.warning("Calcul basé sur le **prix médian** de la zone : c'est un ordre de grandeur, pas le prix d'un bien réel.")
 
 st.divider()
 
