@@ -107,7 +107,7 @@ st.divider()
 st.markdown("##### Socio-économique")
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Revenu médian", f"{fiche['revenu_median']:,} €")
-c2.metric("Taux de pauvreté", f"{fiche['taux_pauvrete']}%")
+c2.metric("Taux de pauvreté (dépt.)", f"{fiche['taux_pauvrete']}%")
 c3.metric("Taux de chômage", f"{fiche['taux_chomage']}%")
 c4.metric("Évolution pop. 5 ans", f"{fiche['evolution_pop_5ans']:+.1f}%")
 
