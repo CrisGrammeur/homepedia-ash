@@ -47,14 +47,19 @@ def render_sidebar() -> dict:
         key="sb_niveau",
     )
 
-    regions = get_regions()
+    try:
+        regions = get_regions()
+    except Exception:
+        st.sidebar.error("Connexion impossible.")
+        st.error(
+            "Connexion à Databricks échouée. À vérifier : le secret **DATABRICKS_TOKEN** "
+            "(scope BI Tools), que le **SQL Warehouse** est bien démarré, et la **version de "
+            "Python** (3.12 recommandé — 3.14 est trop récent pour le connecteur Databricks)."
+        )
+        st.stop()
     if regions.empty:
         st.sidebar.error("Aucune zone disponible.")
-        st.error(
-            "Base de données vide ou inaccessible. "
-            "Vérifie que les tables PostgreSQL sont peuplées (pipeline Silver → PostgreSQL) "
-            "et que la connexion est correcte."
-        )
+        st.error("Base de données accessible mais vide (aucune commune retournée).")
         st.stop()
 
     region_choisie = st.sidebar.selectbox(
